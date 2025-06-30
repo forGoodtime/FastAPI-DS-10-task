@@ -11,11 +11,20 @@ interface WeatherData {
   icon: string;
 }
 
+interface ForecastItem {
+  date: string;
+  temp: number;
+  description: string;
+  icon: string;
+}
+
 const API_URL = 'http://localhost:8000/api/weather';
+const FORECAST_URL = 'http://localhost:8000/api/forecast';
 
 export default function Home() {
   const [city, setCity] = useState('Almaty'); // Город по умолчанию
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [forecast, setForecast] = useState<ForecastItem[]>([]);
   const [loading, setLoading] = useState(true); // true, чтобы загрузка началась сразу
   const [error, setError] = useState('');
 
@@ -33,10 +42,56 @@ export default function Home() {
     }
   };
 
+  // Функция для загрузки прогноза
+  const fetchForecast = async (cityName: string) => {
+    try {
+      const response = await axios.get(`${FORECAST_URL}/${cityName}`);
+      setForecast(response.data.forecast.slice(0, 5)); // Показываем только 5 записей (5 дней)
+    } catch {
+      setForecast([]);
+    }
+  };
+
   // Загружаем погоду для города по умолчанию при первом рендере
   useEffect(() => {
-    fetchWeather('Almaty');
+    // Сначала пробуем получить координаты пользователя
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            setLoading(true);
+            setError('');
+            setWeather(null);
+            const response = await axios.get(
+              `http://localhost:8000/api/weather/coords?lat=${latitude}&lon=${longitude}`
+            );
+            setWeather(response.data);
+            setCity(response.data.city_name || '');
+          } catch (err: any) {
+            setError('Не удалось получить погоду по геолокации.');
+            // Если ошибка — загружаем погоду по умолчанию
+            fetchWeather('Almaty');
+          } finally {
+            setLoading(false);
+          }
+        },
+        () => {
+          // Если пользователь не дал доступ — загружаем погоду по умолчанию
+          fetchWeather('Almaty');
+        }
+      );
+    } else {
+      fetchWeather('Almaty');
+    }
   }, []);
+
+  // Загружаем прогноз при смене города или после получения погоды
+  useEffect(() => {
+    if (city) {
+      fetchForecast(city);
+    }
+  }, [city]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -78,6 +133,30 @@ export default function Home() {
               />
             </div>
             <p className="text-lg capitalize">{weather.description}</p>
+          </div>
+        )}
+
+        {/* Прогноз на 5 дней */}
+        {forecast.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-xl font-bold mb-2 text-center">Прогноз на 5 дней</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {forecast.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
+                  <span className="font-semibold">{item.date.split(' ')[0]}</span>
+                  <span className="flex items-center gap-2">
+                    <Image
+                      src={`https://openweathermap.org/img/wn/${item.icon}.png`}
+                      alt={item.description}
+                      width={40}
+                      height={40}
+                    />
+                    <span>{Math.round(item.temp)}°C</span>
+                  </span>
+                  <span className="capitalize text-sm">{item.description}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
