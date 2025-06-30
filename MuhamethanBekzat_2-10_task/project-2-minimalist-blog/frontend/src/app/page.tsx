@@ -1,59 +1,68 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 
 interface Post {
   slug: string;
   title: string;
+  author: string;
+  date: string;
+  category: string;
+  content: string;
 }
 
-// Make sure this URL matches your backend API route and the backend server is running
 const API_URL = 'http://localhost:8000/api/posts';
 
-export default function Home() {
+export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Все');
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const response = await axios.get(API_URL);
-        setPosts(response.data);
-      } catch (error) {
-        console.error('Error fetching posts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPosts();
+    axios.get(API_URL).then(res => {
+      setPosts(res.data);
+      const cats = Array.from(new Set(res.data.map((p: Post) => p.category).filter(Boolean)));
+      setCategories(['Все', ...cats]);
+    });
   }, []);
 
+  const filteredPosts = selectedCategory === 'Все'
+    ? posts
+    : posts.filter(post => post.category === selectedCategory);
+
   return (
-    <main className="flex flex-col items-center min-h-screen bg-gray-100 p-8">
-      <div className="w-full max-w-2xl">
-        <h1 className="text-5xl font-bold mb-8 text-center text-gray-800">
-          Минималистичный Блог
-        </h1>
-        {loading ? (
-          <p>Загрузка постов...</p>
-        ) : (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <Link
-                key={post.slug}
-                href={`/posts/${post.slug}`}
-                className="block p-6 bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow"
-              >
-                <h2 className="text-2xl font-semibold text-blue-600">
-                  {post.title}
-                </h2>
-              </Link>
-            ))}
-          </div>
-        )}
+    <main className="max-w-2xl mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-6">Минималистичный блог</h1>
+      <div className="mb-4">
+        <span className="mr-2">Категория:</span>
+        {categories.map(cat => (
+          <button
+            key={cat}
+            className={`px-3 py-1 rounded mr-2 mb-2 ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setSelectedCategory(cat)}
+          >
+            {cat}
+          </button>
+        ))}
       </div>
+      <ul>
+        {filteredPosts.map(post => (
+          <li key={post.slug} className="mb-8 border-b pb-4">
+            <Link href={`/posts/${post.slug}`} className="text-xl font-semibold hover:underline">
+              {post.title}
+            </Link>
+            <div className="text-gray-500 text-sm mt-1">
+              Автор: {post.author} | Дата: {post.date} | Категория: {post.category}
+            </div>
+            <div className="prose">
+              <ReactMarkdown>{post.content}</ReactMarkdown>
+            </div>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

@@ -26,23 +26,35 @@ class PostBase(BaseModel):
 
 class PostFull(PostBase):
     content: str
+    author: str
+    date: str
+    category: str  # новое поле
 
 # --- База данных в памяти (простой список Python) ---
 fake_posts_db: List[PostFull] = [
     PostFull(
         slug="first-post",
         title="Мой первый пост",
-        content="Это содержимое моего первого поста. Здесь много интересного текста о веб-разработке!"
+        content="Это содержимое моего первого поста. Здесь много интересного текста о веб-разработке!",
+        author="Muhametzhan Bekzat",
+        date="2024-06-01",
+        category="Разработка"  # добавлено
     ),
     PostFull(
         slug="fastapi-and-nextjs",
         title="FastAPI + Next.js = ❤️",
-        content="Сочетание FastAPI для бэкенда и Next.js для фронтенда - это мощный и современный стек. Асинхронность FastAPI и рендеринг Next.js творят чудеса."
+        content="Сочетание FastAPI для бэкенда и Next.js для фронтенда - это мощный и современный стек. Асинхронность FastAPI и рендеринг Next.js творят чудеса.",
+        author="Amirhan Daulet",
+        date="2024-06-02",
+        category="Веб"  # добавлено
     ),
     PostFull(
         slug="why-i-love-python",
         title="Почему я люблю Python",
-        content="Python - это язык с простым синтаксисом и огромной экосистемой. Он отлично подходит для бэкенда, анализа данных и многого другого."
+        content="Python - это язык с простым синтаксисом и огромной экосистемой. Он отлично подходит для бэкенда, анализа данных и многого другого.",
+        author="Zhalbaslar Daulet",
+        date="2024-06-03",
+        category="Python"  # добавлено
     )
 ]
 
