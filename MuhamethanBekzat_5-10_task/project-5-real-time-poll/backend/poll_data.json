@@ -1,0 +1,21 @@
+{
+  "question": "Ваш любимый фреймворк для бэкенда?",
+  "options": {
+    "fastapi": {
+      "label": "FastAPI",
+      "votes": 1
+    },
+    "django": {
+      "label": "Django",
+      "votes": 0
+    },
+    "flask": {
+      "label": "Flask",
+      "votes": 0
+    },
+    "nodejs": {
+      "label": "Node.js (Express)",
+      "votes": 0
+    }
+  }
+}

@@ -31,9 +31,10 @@ export default function Home() {
 
   // Основной эффект для поллинга
   useEffect(() => {
+    const votedOption = localStorage.getItem('poll-voted');
+    if (votedOption) setVoted(votedOption);
     fetchPollData(); // Получаем данные при первой загрузке
     const intervalId = setInterval(fetchPollData, 3000); // Опрашиваем сервер каждые 3 секунды
-
     // Очищаем интервал при размонтировании компонента, чтобы избежать утечек памяти
     return () => clearInterval(intervalId);
   }, []);
@@ -43,7 +44,8 @@ export default function Home() {
       try {
         const response = await axios.post(`${API_URL}/poll/vote/${optionKey}`);
         setPollData(response.data); // Сразу обновляем данные, не дожидаясь следующего опроса
-        setVoted(optionKey); // Отмечаем, что пользователь проголосовал
+        setVoted(optionKey);
+        localStorage.setItem('poll-voted', optionKey); // Отмечаем, что пользователь проголосовал
       } catch (error) {
         console.error("Failed to cast vote:", error);
       }
