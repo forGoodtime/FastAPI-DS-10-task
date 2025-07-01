@@ -3,6 +3,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
+from typing import Optional
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
@@ -16,44 +18,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+LIFETIME_DAYS = 7
+
 # --- "База данных" в памяти (словарь Python) ---
-# Ключ - короткий код, значение - длинный URL
 url_db = {}
 
-# --- Pydantic модели ---
+# --- Pydantic модель ---
 class URLCreate(BaseModel):
-    long_url: HttpUrl # Pydantic проверит, что это валидный URL
+    long_url: HttpUrl
+    custom_code: Optional[str] = None
 
-# --- Эндпоинты API ---
-
+# --- Эндпоинт для создания короткой ссылки ---
 @app.post("/api/shorten")
 def create_short_url(url_data: URLCreate, request: Request):
-    """Создает короткий код для длинного URL."""
     long_url = str(url_data.long_url)
+    short_code = url_data.custom_code or secrets.token_urlsafe(6)
 
-    # Генерируем случайный безопасный код
-    # secrets.token_urlsafe(n) генерирует строку из n байт
-    short_code = secrets.token_urlsafe(6)
+    if short_code in url_db:
+        raise HTTPException(status_code=400, detail="Short code already exists")
 
-    # Убедимся, что код уникален (для простого примера можно пропустить)
-    while short_code in url_db:
-        short_code = secrets.token_urlsafe(6)
+    url_db[short_code] = {
+        "long_url": long_url,
+        "clicks": 0,
+        "created_at": datetime.utcnow().isoformat()
+    }
 
-    url_db[short_code] = long_url
-
-    # Формируем полный короткий URL для ответа
     base_url = str(request.base_url)
     short_url = f"{base_url}{short_code}"
 
-    return {"short_url": short_url}
+    return {"short_url": short_url, "short_code": short_code, "clicks": 0}
 
+# --- Эндпоинт для редиректа и подсчёта кликов ---
 @app.get("/{short_code}")
 def redirect_to_long_url(short_code: str):
-    """Ищет длинный URL по короткому коду и перенаправляет на него."""
-    long_url = url_db.get(short_code)
+    url_info = url_db.get(short_code)
 
-    if not long_url:
+    if not url_info:
         raise HTTPException(status_code=404, detail="Short URL not found")
 
-    # Выполняем HTTP 307 Temporary Redirect
-    return RedirectResponse(url=long_url)
+    created_at = datetime.fromisoformat(url_info["created_at"])
+    if datetime.utcnow() - created_at > timedelta(days=LIFETIME_DAYS):
+        raise HTTPException(status_code=410, detail="Short URL has expired")
+
+    url_info["clicks"] += 1
+
+    return RedirectResponse(url=url_info["long_url"])
+
+# --- Эндпоинт для получения статистики ---
+@app.get("/api/stats/{short_code}")
+def get_url_stats(short_code: str, request: Request):
+    url_info = url_db.get(short_code)
+
+    if not url_info:
+        raise HTTPException(status_code=404, detail="Short URL not found")
+
+    return {
+        "short_url": f"{request.base_url}{short_code}",
+        "long_url": url_info["long_url"],
+        "clicks": url_info["clicks"],
+        "created_at": url_info["created_at"]
+    }

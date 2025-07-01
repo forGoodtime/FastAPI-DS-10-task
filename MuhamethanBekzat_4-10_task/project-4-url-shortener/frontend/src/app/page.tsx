@@ -4,10 +4,13 @@ import { useState, FormEvent } from 'react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api/shorten';
+const STATS_URL = 'http://localhost:8000/api/stats';
 
 export default function Home() {
   const [longUrl, setLongUrl] = useState('');
+  const [customCode, setCustomCode] = useState('');
   const [shortUrl, setShortUrl] = useState('');
+  const [clicks, setClicks] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -18,11 +21,24 @@ export default function Home() {
     setError('');
     setShortUrl('');
     setCopied(false);
+    setClicks(null);
     try {
-      const response = await axios.post(API_URL, { long_url: longUrl });
+      const response = await axios.post(API_URL, {
+        long_url: longUrl,
+        custom_code: customCode || undefined,
+      });
       setShortUrl(response.data.short_url);
+
+      // Получаем статистику сразу после создания
+      const code = response.data.short_code;
+      const stats = await axios.get(`${STATS_URL}/${code}`);
+      setClicks(stats.data.clicks);
     } catch (err: any) {
-      setError(err.response?.data?.detail[0]?.msg || 'Неверный URL или ошибка сервера.');
+      setError(
+        err.response?.data?.detail?.[0]?.msg ||
+        err.response?.data?.detail ||
+        'Неверный URL или ошибка сервера.'
+      );
     } finally {
       setLoading(false);
     }
@@ -32,7 +48,7 @@ export default function Home() {
     if (!shortUrl) return;
     navigator.clipboard.writeText(shortUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000); // Сбросить статус "скопировано" через 2 сек
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -54,6 +70,19 @@ export default function Home() {
               required
             />
           </div>
+          <div>
+            <label htmlFor="customCode" className="block mb-2 text-sm font-medium text-gray-400">
+              Кастомный короткий код (необязательно)
+            </label>
+            <input
+              id="customCode"
+              type="text"
+              value={customCode}
+              onChange={(e) => setCustomCode(e.target.value)}
+              placeholder="Например: mylink"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-white"
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -64,9 +93,9 @@ export default function Home() {
         </form>
 
         {error && (
-            <div className="p-3 text-center text-red-400 bg-red-900/50 rounded-lg">
-                <p>{error}</p>
-            </div>
+          <div className="p-3 text-center text-red-400 bg-red-900/50 rounded-lg">
+            <p>{error}</p>
+          </div>
         )}
 
         {shortUrl && (
@@ -83,6 +112,7 @@ export default function Home() {
                 {copied ? 'Скопировано!' : 'Копировать'}
               </button>
             </div>
+            <div className="text-sm text-gray-300">Переходов: {clicks ?? 0}</div>
           </div>
         )}
       </div>
