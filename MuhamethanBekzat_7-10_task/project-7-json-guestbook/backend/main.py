@@ -1,11 +1,12 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import aiofiles
+import os
 
 app = FastAPI()
 
@@ -14,6 +15,13 @@ origins = ["http://localhost:3000"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DB_FILE = "data/guestbook.json"
+
+# Создаём папку data, если её нет
+os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+# Создаём файл guestbook.json, если его нет
+if not os.path.exists(DB_FILE):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        f.write("[]")
 
 # --- Pydantic модели ---
 class GuestbookEntry(BaseModel):
@@ -24,6 +32,9 @@ class GuestbookEntry(BaseModel):
 
 class EntryCreate(BaseModel):
     name: str
+    message: str
+
+class EntryUpdate(BaseModel):
     message: str
 
 # --- Вспомогательные функции для работы с файлом ---
@@ -43,9 +54,15 @@ async def write_db(data: List[GuestbookEntry]):
 
 # --- Эндпоинты API ---
 @app.get("/api/entries", response_model=List[GuestbookEntry])
-async def get_all_entries():
-    """Возвращает все записи из гостевой книги."""
-    return await read_db()
+async def get_all_entries(
+    page: int = Query(1, ge=1, description="Номер страницы"),
+    limit: int = Query(10, ge=1, le=100, description="Количество записей на странице")
+):
+    """Возвращает записи с пагинацией."""
+    entries = await read_db()
+    start = (page - 1) * limit
+    end = start + limit
+    return entries[start:end]
 
 @app.post("/api/entries", response_model=GuestbookEntry, status_code=201)
 async def create_entry(entry_data: EntryCreate):
@@ -63,3 +80,24 @@ async def create_entry(entry_data: EntryCreate):
     await write_db(entries)
 
     return new_entry
+
+@app.delete("/api/entries/{entry_id}", status_code=204)
+async def delete_entry(entry_id: str):
+    """Удаляет запись по ID."""
+    entries = await read_db()
+    new_entries = [entry for entry in entries if entry.id != entry_id]
+    if len(new_entries) == len(entries):
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    await write_db(new_entries)
+    return
+
+@app.put("/api/entries/{entry_id}", response_model=GuestbookEntry)
+async def update_entry(entry_id: str, entry_data: EntryUpdate):
+    """Редактирует текст сообщения по ID."""
+    entries = await read_db()
+    for entry in entries:
+        if entry.id == entry_id:
+            entry.message = entry_data.message
+            await write_db(entries)
+            return entry
+    raise HTTPException(status_code=404, detail="Запись не найдена")

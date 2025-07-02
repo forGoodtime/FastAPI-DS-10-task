@@ -18,10 +18,12 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const fetchEntries = async () => {
     try {
-      const response = await axios.get(API_URL);
+      const response = await axios.get(`${API_URL}?page=${page}&limit=${limit}`);
       // Сортируем записи так, чтобы новые были сверху
       const sortedEntries = response.data.sort((a: Entry, b: Entry) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -34,7 +36,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchEntries();
-  }, []);
+  }, [page]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -56,6 +58,15 @@ export default function Home() {
       setError('Ошибка при отправке сообщения.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await axios.delete(`${API_URL}/${id}`);
+      setEntries(entries.filter(entry => entry.id !== id));
+    } catch {
+      setError('Ошибка при удалении записи.');
     }
   };
 
@@ -96,13 +107,28 @@ export default function Home() {
 
         <div className="space-y-4">
           {entries.map(entry => (
-            <div key={entry.id} className="bg-white p-4 rounded-lg shadow">
-              <p className="text-gray-800">{entry.message}</p>
-              <div className="text-right text-sm text-gray-500 mt-2">
-                <strong>- {entry.name}</strong> в {new Date(entry.timestamp).toLocaleString()}
+            <div key={entry.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-start gap-2">
+              <div>
+                <p className="text-gray-800">{entry.message}</p>
+                <div className="text-right text-sm text-gray-500 mt-2">
+                  <strong>- {entry.name}</strong> в {new Date(entry.timestamp).toLocaleString()}
+                </div>
               </div>
+              <button
+                onClick={() => handleDelete(entry.id)}
+                className="text-red-500 hover:text-red-700 font-bold px-2"
+                title="Удалить"
+              >
+                ×
+              </button>
             </div>
           ))}
+        </div>
+
+        <div className="flex justify-center gap-4 mt-6">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Назад</button>
+          <span>Страница {page}</span>
+          <button onClick={() => setPage(p => p + 1)} className="px-4 py-2 bg-gray-300 rounded">Вперед</button>
         </div>
       </div>
     </main>
