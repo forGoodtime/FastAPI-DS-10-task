@@ -1,12 +1,15 @@
 import os
 import uuid
 import aiofiles
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Path
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 
 app = FastAPI()
+
+MAX_SIZE_MB = 5
+MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
 
 # --- CORS ---
 origins = ["http://localhost:3000"]
@@ -27,6 +30,11 @@ async def upload_image(file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file is not an image.")
 
+    # Проверка размера файла
+    content = await file.read()
+    if len(content) > MAX_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail=f"Файл слишком большой (максимум {MAX_SIZE_MB} МБ).")
+
     # Проверка наличия имени файла
     if not file.filename:
         raise HTTPException(status_code=400, detail="Uploaded file has no filename.")
@@ -41,7 +49,6 @@ async def upload_image(file: UploadFile = File(...)):
         from aiofiles.threadpool.binary import AsyncBufferedIOBase  # type: ignore
         async with aiofiles.open(file_path, mode='wb') as out_file:  # type: ignore
             out_file: AsyncBufferedIOBase
-            content = await file.read()
             await out_file.write(content)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
@@ -50,6 +57,17 @@ async def upload_image(file: UploadFile = File(...)):
     file_url = f"/static/images/{unique_filename}"
     return {"url": file_url}
 
+@app.delete("/api/images/{filename}")
+async def delete_image(filename: str = Path(...)):
+    """Удаляет изображение по имени файла."""
+    file_path = os.path.join(IMAGE_DIR, filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    try:
+        os.remove(file_path)
+        return {"detail": "Файл успешно удалён"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при удалении файла: {e}")
 
 @app.get("/api/images", response_model=List[str])
 async def get_images():

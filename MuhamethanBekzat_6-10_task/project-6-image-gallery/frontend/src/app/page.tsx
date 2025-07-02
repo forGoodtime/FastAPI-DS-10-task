@@ -3,6 +3,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import axios from 'axios';
 import Image from 'next/image';
+import { TrashIcon } from '@heroicons/react/24/solid'; // Если используешь heroicons, иначе замени на свой svg
 
 const API_URL = 'http://localhost:8000';
 
@@ -11,6 +12,7 @@ export default function Home() {
   const [images, setImages] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const fetchImages = async () => {
     try {
@@ -44,10 +46,16 @@ export default function Home() {
 
     setUploading(true);
     setError('');
+    setProgress(0);
 
     try {
       await axios.post(`${API_URL}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            setProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+          }
+        },
       });
       // После успешной загрузки, обновляем галерею
       fetchImages();
@@ -56,6 +64,20 @@ export default function Home() {
       setError(err.response?.data?.detail || 'Ошибка загрузки файла.');
     } finally {
       setUploading(false);
+      setProgress(0);
+    }
+  };
+
+  const handleDelete = async (imgUrl: string) => {
+    // Получаем только имя файла
+    const filename = imgUrl.split('/').pop();
+    if (!filename) return;
+    try {
+      await axios.delete(`${API_URL}/api/images/${filename}`);
+      // После удаления обновляем галерею
+      fetchImages();
+    } catch (err) {
+      setError('Ошибка при удалении файла.');
     }
   };
 
@@ -79,12 +101,20 @@ export default function Home() {
         <button type="submit" disabled={!selectedFile || uploading} className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400">
           {uploading ? 'Загрузка...' : 'Загрузить'}
         </button>
+        {uploading && (
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+            <div
+              className="bg-blue-500 h-2.5 rounded-full transition-all"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        )}
         {error && <p className="text-red-500 text-xs italic mt-4">{error}</p>}
       </form>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {images.map((imgUrl, index) => (
-          <div key={index} className="relative aspect-square rounded-lg overflow-hidden shadow-lg">
+          <div key={index} className="relative aspect-square rounded-lg overflow-hidden shadow-lg group">
             <Image
               src={
                 imgUrl.startsWith('http://') || imgUrl.startsWith('https://')
@@ -95,8 +125,19 @@ export default function Home() {
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority={index < 4} // Приоритет для первых нескольких изображений
+              priority={index < 4}
             />
+            {/* Кнопка удаления */}
+            <button
+              onClick={() => handleDelete(imgUrl)}
+              className="absolute top-2 right-2 bg-white/80 hover:bg-red-500 hover:text-white text-red-600 rounded-full p-2 shadow transition-opacity opacity-0 group-hover:opacity-100"
+              title="Удалить"
+            >
+              {/* Можно использовать иконку heroicons или свой SVG */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         ))}
       </div>
