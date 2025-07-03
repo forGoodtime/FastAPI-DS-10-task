@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -31,8 +31,14 @@ class Product(BaseModel):
 
 # --- Эндпоинты API ---
 @app.get("/api/products", response_model=List[Product])
-async def filter_products(search: Optional[str] = None, category: Optional[str] = None):
-    """Фильтрует продукты по поисковому запросу и/или категории."""
+async def filter_products(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = Query(None, ge=0),
+    max_price: Optional[float] = Query(None, ge=0),
+    sort: Optional[str] = Query(None, description="price_asc или price_desc")
+):
+    """Фильтрует продукты по поиску, категории, диапазону цен и сортирует по цене."""
     filtered_products = PRODUCTS_DB
 
     # Фильтрация по категории
@@ -42,6 +48,20 @@ async def filter_products(search: Optional[str] = None, category: Optional[str] 
     # Фильтрация по поисковому запросу
     if search:
         filtered_products = [p for p in filtered_products if search.lower() in p["name"].lower()]
+
+    # Фильтрация по минимальной цене
+    if min_price is not None:
+        filtered_products = [p for p in filtered_products if p["price"] >= min_price]
+
+    # Фильтрация по максимальной цене
+    if max_price is not None:
+        filtered_products = [p for p in filtered_products if p["price"] <= max_price]
+
+    # Сортировка по цене
+    if sort == "price_asc":
+        filtered_products = sorted(filtered_products, key=lambda p: p["price"])
+    elif sort == "price_desc":
+        filtered_products = sorted(filtered_products, key=lambda p: p["price"], reverse=True)
 
     return filtered_products
 

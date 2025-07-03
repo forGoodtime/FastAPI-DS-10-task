@@ -24,6 +24,10 @@ export default function Home() {
   // Состояние загрузки
   const [loading, setLoading] = useState(true);
 
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [sort, setSort] = useState('');
+
   // Загрузка категорий один раз при монтировании компонента
   useEffect(() => {
     const fetchCategories = async () => {
@@ -42,14 +46,12 @@ export default function Home() {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        // Формируем параметры запроса
         const params = new URLSearchParams();
-        if (searchTerm) {
-          params.append('search', searchTerm);
-        }
-        if (selectedCategory && selectedCategory !== 'All') {
-          params.append('category', selectedCategory);
-        }
+        if (searchTerm) params.append('search', searchTerm);
+        if (selectedCategory && selectedCategory !== 'All') params.append('category', selectedCategory);
+        if (minPrice) params.append('min_price', minPrice);
+        if (maxPrice) params.append('max_price', maxPrice);
+        if (sort) params.append('sort', sort);
 
         const response = await axios.get(`${API_URL}/products?${params.toString()}`);
         setProducts(response.data);
@@ -59,8 +61,12 @@ export default function Home() {
         setLoading(false);
       }
     };
-    fetchProducts();
-  }, [searchTerm, selectedCategory]); // Этот эффект перезапустится при изменении любого из этих состояний
+    const handler = setTimeout(() => {
+      fetchProducts();
+    }, 400); // 400 мс задержка
+
+    return () => clearTimeout(handler);
+  }, [searchTerm, selectedCategory, minPrice, maxPrice, sort]); // Этот эффект перезапустится при изменении любого из этих состояний
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -88,6 +94,31 @@ export default function Home() {
             {categories.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
+          </select>
+          <input
+            type="number"
+            min={0}
+            placeholder="Мин. цена"
+            value={minPrice}
+            onChange={e => setMinPrice(e.target.value)}
+            className="p-2 border rounded-md w-full"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Макс. цена"
+            value={maxPrice}
+            onChange={e => setMaxPrice(e.target.value)}
+            className="p-2 border rounded-md w-full"
+          />
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value)}
+            className="p-2 border rounded-md w-full"
+          >
+            <option value="">Без сортировки</option>
+            <option value="price_asc">Сначала дешевые</option>
+            <option value="price_desc">Сначала дорогие</option>
           </select>
         </div>
 
