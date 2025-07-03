@@ -3,7 +3,15 @@ import { useState, useEffect, FormEvent } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
-interface Post { id: string; text: string; timestamp: string; owner_id: string; owner_username: string; }
+interface Post {
+  id: string;
+  text: string;
+  timestamp: string;
+  owner_id: string;
+  owner_username: string;
+  likes: number;
+  liked_by_me?: boolean; // новое поле
+}
 interface User { id: string; username: string; }
 
 const API_URL = 'http://localhost:8000/api';
@@ -56,6 +64,26 @@ export default function HomePage() {
     }
   };
 
+  const handleLike = async (postId: string) => {
+    const token = localStorage.getItem('auth_token');
+    try {
+      await axios.post(`${API_URL}/posts/${postId}/like`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      fetchPosts();
+    } catch (error) {
+      // Можно добавить обработку ошибок, если уже лайкнуто
+    }
+  };
+
+  const handleUnlike = async (postId: string) => {
+    const token = localStorage.getItem('auth_token');
+    try {
+      await axios.delete(`${API_URL}/posts/${postId}/like`, { headers: { Authorization: `Bearer ${token}` } });
+      fetchPosts();
+    } catch (error) {
+      // Можно добавить обработку ошибок, если не было лайка
+    }
+  };
+
   if (!user) return <p>Загрузка...</p>;
 
   return (
@@ -63,7 +91,16 @@ export default function HomePage() {
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Лента</h1>
         <div>
-          <span>Привет, <strong>{user.username}</strong>!</span>
+          <span>
+            Привет, <strong>
+              <a
+                href={`/users/${user.username}`}
+                className="text-blue-600 hover:underline"
+              >
+                {user.username}
+              </a>
+            </strong>!
+          </span>
           <button onClick={handleLogout} className="ml-4 bg-red-500 text-white py-1 px-3 rounded text-sm">Выйти</button>
         </div>
       </header>
@@ -85,6 +122,19 @@ export default function HomePage() {
             <p>{post.text}</p>
             <div className="text-xs text-gray-500 mt-2">
               <strong>{post.owner_username}</strong> - {new Date(post.timestamp).toLocaleString()}
+            </div>
+            <div className="flex items-center mt-2 space-x-2">
+              <button
+                onClick={() => handleLike(post.id)}
+                className="text-blue-500 hover:underline"
+                title="Поставить лайк"
+              >👍</button>
+              <span>{post.likes}</span>
+              <button
+                onClick={() => handleUnlike(post.id)}
+                className="text-gray-400 hover:text-blue-500"
+                title="Убрать лайк"
+              >👎</button>
             </div>
             {user && user.id === post.owner_id && (
               <button onClick={() => handleDeletePost(post.id)} className="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold">✕</button>
