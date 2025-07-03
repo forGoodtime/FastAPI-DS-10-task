@@ -23,6 +23,7 @@ export default function LoginPage() {
 
       // Сохраняем токен в localStorage
       localStorage.setItem('auth_token', response.data.access_token);
+      localStorage.setItem('user_role', response.data.role); // <--- добавить эту строку
 
       // Перенаправляем на защищенную страницу
       router.push('/dashboard');
@@ -39,11 +40,11 @@ export default function LoginPage() {
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <div className="mb-4">
           <label className="block mb-1">Имя пользователя</label>
-          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full p-2 border rounded" />
+          <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setError(''); }} className="w-full p-2 border rounded" />
         </div>
         <div className="mb-6">
           <label className="block mb-1">Пароль</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-2 border rounded" />
+          <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} className="w-full p-2 border rounded" />
         </div>
         <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
           Войти
